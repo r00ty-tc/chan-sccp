@@ -2107,9 +2107,9 @@ sccp_value_changed_t sccp_config_addButton(sccp_buttonconfig_list_t *buttonconfi
 		case LINE:
 		{
 			char extension[SCCP_MAX_EXTENSION];
-			sccp_subscription_id_t *subscriptionId = (sccp_subscription_id_t *)sccp_malloc(sizeof(sccp_subscription_id_t));
+			sccp_subscription_id_t * subscriptionId = (sccp_subscription_id_t *)sccp_calloc(1, sizeof(sccp_subscription_id_t));
 			if (!subscriptionId) {
-				pbx_log(LOG_ERROR, "SCCP: could not allocate memory. giving up\n");
+				pbx_log(LOG_ERROR, SS_Memory_Allocation_Error, "SCCP");
 				return SCCP_CONFIG_CHANGE_INVALIDVALUE;
  			}
 			if (sccp_parseComposedId(name, 80, subscriptionId, extension)) {;
@@ -2385,6 +2385,14 @@ boolean_t sccp_config_general(sccp_readingtype_t readingtype)
 		in->sin_port = ntohs(DEFAULT_SCCP_PORT);
 		GLOB(bindaddr).ss_family = AF_INET;
 	}
+#ifdef HAVE_OPENSSL
+	if(!sccp_netsock_getPort(&GLOB(secbindaddr))) {
+		struct sockaddr_in * in = (struct sockaddr_in *)&GLOB(secbindaddr);
+
+		in->sin_port = ntohs(DEFAULT_SCCP_SECURE_PORT);
+		GLOB(secbindaddr).ss_family = AF_INET;
+	}
+#endif
 
 	sccp_configurationchange_t res = sccp_config_applyGlobalConfiguration(v);
 
