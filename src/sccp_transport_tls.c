@@ -15,29 +15,13 @@ SCCP_FILE_VERSION(__FILE__, "");
 
 #include "sccp_transport.h"
 
-#ifdef HAVE_OPENSSL
-#	define PBX_CERTFILE "asterisk.pem"                                        // move to config.h (copy from tcptls.h)
-
-#	ifdef HAVE_OPENSSL
-//#		include <openssl/asn1.h>        /* for ASN1_STRING_to_UTF8 */
+#ifdef HAVE_LIBSSL
+#	include <openssl/err.h> /* for ERR_print_errors_fp */
+#	include <openssl/ssl.h> /* for SSL_CTX_free, SSL_get_error, ... */
+#	ifdef HAVE_CRYPTO
 #		include <openssl/crypto.h> /* for OPENSSL_free */
-#		include <openssl/err.h>    /* for ERR_print_errors_fp */
-//#		include <openssl/opensslconf.h> /* for OPENSSL_NO_SSL3_METHOD, OPENS... */
-//#		include <openssl/opensslv.h>    /* for OPENSSL_VERSION_NUMBER */
-//#		include <openssl/safestack.h>   /* for STACK_OF */
-#		include <openssl/ssl.h> /* for SSL_CTX_free, SSL_get_error, ... */
-//#		include <openssl/x509.h>        /* for X509_free, X509_NAME_ENTRY_ge... */
-//#		include <openssl/x509v3.h>      /* for GENERAL_NAME, sk_GENERAL_NAME... */
-//#		ifndef OPENSSL_NO_DH
-//#			include <openssl/bio.h> /* for BIO_free, BIO_new_file */
-//#			include <openssl/dh.h>  /* for DH_free */
-//#			include <openssl/pem.h> /* for PEM_read_bio_DHparams */
-//#		endif                           /* OPENSSL_NO_DH */
-//#		ifndef OPENSSL_NO_EC
-//#			include <openssl/ec.h> /* for EC_KEY_free, EC_KEY_new_by_cu... */
-//#		endif                          /* OPENSSL_NO_EC */
 #	endif
-
+#	define PBX_CERTFILE           "asterisk.pem"                                        // move to config.h (copy from tcptls.h)
 #	define REQUEST_RETRY_INTERVAL 5
 #	define REQUEST_RETRY_COUNT    2
 #	define DUPLICATE_INTERVAL     REQUEST_RETRY_INTERVAL * REQUEST_RETRY_COUNT
@@ -251,5 +235,5 @@ const sccp_transport_t * const tls_init(uint8_t h)
 {
 	return NULL;
 }
-#endif /* DO_SSL */
+#endif /* HAVE_LIBSSL */
 // kate: indent-width 8; replace-tabs off; indent-mode cstyle; auto-insert-doxygen on; line-numbers on; tab-indents on; keep-extra-spaces off; auto-brackets off;

@@ -45,7 +45,7 @@ struct sccp_transport {
 };
 
 const sccp_transport_t * const tcp_init(void);
-#ifdef HAVE_OPENSSL
+#ifdef HAVE_LIBSSL
 const sccp_transport_t * const tls_init(void);
 #endif
 
