@@ -76,18 +76,15 @@ static void ShutdownSSL(SSL * ssl)
 static SSL_CTX * create_context()
 {
 	pbx_log(LOG_NOTICE, "TLS Transport create context...\n");
-	const SSL_METHOD * method;
-	SSL_CTX * ctx = NULL;
-
-	method = TLS_server_method();
-
-	ctx = SSL_CTX_new(method);
+	// const SSL_METHOD * method = TLS_server_method();
+	const SSL_METHOD * method = SSLv23_method();
+	SSL_CTX * ctx = SSL_CTX_new(method);
 	if(!ctx) {
 		pbx_log(LOG_WARNING, "Unable to create SSL context\n");
 		write_openssl_error_to_log();
 		return NULL;
 	}
-	SSL_CTX_set_options(ctx, SSL_OP_SINGLE_DH_USE);
+	SSL_CTX_set_options(ctx, SSL_OP_SINGLE_DH_USE | SSL_OP_NO_SSLv2);
 
 	return ctx;
 }
