@@ -1064,7 +1064,7 @@ boolean_t sccp_session_bind_and_listen(sccp_servercontext_t * context, struct so
 	}
 	*/
 
-	sccp_log((DEBUGCAT_CORE))(VERBOSE_PREFIX_3 "Running bind and listen '%s'!\n", addrStr);
+	sccp_log((DEBUGCAT_CORE))(VERBOSE_PREFIX_3 "Running bind and listen '%s'\n", addrStr);
 	if(context->sc.fd < 0) {
 		int status = 0;
 		port = sccp_netsock_getPort(bindaddr);

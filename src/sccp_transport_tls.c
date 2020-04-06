@@ -188,13 +188,21 @@ static int tls_send(sccp_socket_connection_t * sc, void * buf, size_t buflen, in
 static int tls_shutdown(sccp_socket_connection_t * sc, int how)
 {
 	// pbx_log(LOG_NOTICE, "TLS Transport shutdown...\n");
+	SSL_shutdown(sc->ssl);
 	return shutdown(sc->fd, how);
 }
 
 static int tls_close(sccp_socket_connection_t * sc)
 {
 	// pbx_log(LOG_NOTICE, "TLS Transport close...\n");
-	return close(sc->fd);
+	int res=0;
+	if (sc->fd) {
+		res = close(sc->fd);
+	}
+	if (sc->ssl) {
+		SSL_free(sc->ssl);
+	}
+	return res;
 }
 
 static const sccp_transport_t * const tls_destroy(uint8_t h)
