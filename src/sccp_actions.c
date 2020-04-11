@@ -302,8 +302,7 @@ void sccp_handle_dialtone(constDevicePtr d, constLinePtr l, constChannelPtr chan
 	 * etc.
 	 * */
 	if (sccp_strlen_zero(channel->dialedNumber) && channel->state != SCCP_CHANNELSTATE_OFFHOOK) {
-		sccp_dev_stoptone(d, instance, channel->callid);
-		sccp_dev_starttone(d, SKINNY_TONE_INSIDEDIALTONE, instance, channel->callid, SKINNY_TONEDIRECTION_USER);
+		sccp_channel_tone(channel, SKINNY_TONE_INSIDEDIALTONE, SKINNY_TONEDIRECTION_USER);
 	} else if (!sccp_strlen_zero(channel->dialedNumber)) {
 		sccp_indicate(d, channel, SCCP_CHANNELSTATE_DIGITSFOLL);
 	}
@@ -3286,7 +3285,7 @@ void handle_soft_key_event(constSessionPtr s, devicePtr d, constMessagePtr msg_i
 		if (event != SKINNY_LBL_ENDCALL) {
 			snprintf(buf, sizeof(buf), SKINNY_DISP_NO_CHANNEL_TO_PERFORM_XXXXXXX_ON " " SKINNY_GIVING_UP, label2str(event));
 			sccp_dev_displayprinotify(d, buf, SCCP_MESSAGE_PRIORITY_TIMEOUT, 5);
-			sccp_dev_starttone(d, SKINNY_TONE_BEEPBONK, lineInstance, callid, SKINNY_TONEDIRECTION_USER);
+			sccp_channel_tone(c, SKINNY_TONE_BEEPBONK, SKINNY_TONEDIRECTION_USER);
 			pbx_log(LOG_WARNING, "%s: Skip handling of Softkey %s (%d) line=%d callid=%d, because a channel is required, but not provided. Exiting\n", d->id, label2str(event), event, lineInstance, callid);
 		}
 

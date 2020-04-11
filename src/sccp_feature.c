@@ -95,7 +95,7 @@ void sccp_feat_handle_callforward(constLinePtr l, constDevicePtr d, sccp_cfwd_t 
 			if (c->state == SCCP_CHANNELSTATE_RINGOUT || c->state == SCCP_CHANNELSTATE_CONNECTED || c->state == SCCP_CHANNELSTATE_PROCEED || c->state == SCCP_CHANNELSTATE_BUSY || c->state == SCCP_CHANNELSTATE_CONGESTION) {
 				if (c->calltype == SKINNY_CALLTYPE_OUTBOUND && !sccp_strlen_zero(c->dialedNumber)) {	// if we have an outbound call, we can set callforward to dialed number -FS
 					sccp_line_cfwd(l, d, type, c->dialedNumber);
-					sccp_dev_starttone(d, SKINNY_TONE_ZIP, ld->lineInstance, c->callid, SKINNY_TONEDIRECTION_USER);
+					sccp_channel_tone(c, SKINNY_TONE_ZIP, SKINNY_TONEDIRECTION_USER);
 					sccp_channel_endcall(c);
 					return;
 				} else if(iPbx.channel_is_bridged(c)) {                                        // check if we have an ast channel to get callerid from					// if we have an incoming or
@@ -107,7 +107,7 @@ void sccp_feat_handle_callforward(constLinePtr l, constDevicePtr d, sccp_cfwd_t 
 					if(number && !sccp_strlen_zero(number)) {
 						sccp_line_cfwd(l, d, type, number);
 						// we are on call, so no tone has been played until now :)
-						sccp_dev_starttone(d, SKINNY_TONE_ZIP, ld->lineInstance, c->callid, SKINNY_TONEDIRECTION_USER);
+						sccp_channel_tone(c, SKINNY_TONE_ZIP, SKINNY_TONEDIRECTION_USER);
 						sccp_channel_endcall(c);
 						sccp_free(number);
 						return;
@@ -227,7 +227,7 @@ static int sccp_feat_perform_pickup(constDevicePtr d, channelPtr c, PBX_CHANNEL_
 	} else {                                        // pickup failed
 		sccp_log((DEBUGCAT_CORE))(VERBOSE_PREFIX_3 "SCCP: (perform_pickup) Giving Up\n");
 		sccp_dev_displayprompt(d, lineInstance, c->callid, SKINNY_DISP_TEMP_FAIL " " SKINNY_DISP_OPICKUP, SCCP_DISPLAYSTATUS_TIMEOUT);
-		sccp_dev_starttone(d, SKINNY_TONE_BEEPBONK, lineInstance, c->callid, SKINNY_TONEDIRECTION_USER);
+		sccp_channel_tone(c, SKINNY_TONE_BEEPBONK, SKINNY_TONEDIRECTION_USER);
 		sccp_channel_schedule_hangup(c, 5000);
 	}
 #else
@@ -364,11 +364,7 @@ int sccp_feat_directed_pickup(constDevicePtr d, channelPtr c, uint32_t lineInsta
 		} else {
 			pbx_log(LOG_NOTICE, "%s: (directed_pickup) findPickupChannelByExtenLocked failed on call: %s\n", DEV_ID_LOG(d), c->designator);
 			sccp_dev_displayprinotify(d, SKINNY_DISP_NO_CALL_AVAILABLE_FOR_PICKUP, SCCP_MESSAGE_PRIORITY_TIMEOUT, 5);
-			if (c->state == SCCP_CHANNELSTATE_ONHOOK || c->state == SCCP_CHANNELSTATE_DOWN) {
-				sccp_dev_starttone(d, SKINNY_TONE_BEEPBONK, 0, 0, SKINNY_TONEDIRECTION_USER);
-			} else {
-				sccp_dev_starttone(d, SKINNY_TONE_BEEPBONK, lineInstance, c->callid, SKINNY_TONEDIRECTION_USER);
-			}
+			sccp_channel_tone(c, SKINNY_TONE_BEEPBONK, SKINNY_TONEDIRECTION_USER);
 			sccp_channel_schedule_hangup(c, 500);
 		}
 		pbx_channel_unref(original);
@@ -456,11 +452,7 @@ int sccp_feat_grouppickup(constDevicePtr d, constLinePtr l, uint32_t lineInstanc
 			} else {
 				pbx_log(LOG_NOTICE, "%s: (gpickup) findPickupChannelByExtenLocked failed on call: %s\n", DEV_ID_LOG(d), c->designator);
 				sccp_dev_displayprinotify(d, SKINNY_DISP_NO_CALL_AVAILABLE_FOR_PICKUP, SCCP_MESSAGE_PRIORITY_TIMEOUT, 5);
-				if (c->state == SCCP_CHANNELSTATE_ONHOOK || c->state == SCCP_CHANNELSTATE_DOWN) {
-					sccp_dev_starttone(d, SKINNY_TONE_BEEPBONK, 0, 0, SKINNY_TONEDIRECTION_USER);
-				} else {
-					sccp_dev_starttone(d, SKINNY_TONE_BEEPBONK, lineInstance, c->callid, SKINNY_TONEDIRECTION_USER);
-				}
+				sccp_channel_tone(c, SKINNY_TONE_BEEPBONK, SKINNY_TONEDIRECTION_USER);
 				sccp_channel_schedule_hangup(c, 500);
 			}
 			pbx_channel_unref(original);
@@ -850,7 +842,7 @@ void sccp_feat_handle_meetme(constLinePtr l, uint8_t lineInstance, constDevicePt
 			// we have a channel, checking if
 			if (c->state == SCCP_CHANNELSTATE_OFFHOOK && sccp_strlen_zero(c->dialedNumber)) {
 				// we are dialing but without entering a number :D -FS
-				sccp_dev_stoptone(d, lineInstance, (c && c->callid) ? c->callid : 0);
+				sccp_channel_tone(c, SKINNY_TONE_SILENCE, SKINNY_TONEDIRECTION_BOTH);
 				// changing SOFTSWITCH_DIALING mode to SOFTSWITCH_GETFORWARDEXTEN
 				c->softswitch_action = SCCP_SOFTSWITCH_GETMEETMEROOM;				/* SoftSwitch will catch a number to be dialed */
 				c->ss_data = 0;									/* this should be found in thread */
@@ -1295,7 +1287,7 @@ int sccp_feat_sharedline_barge(constLineDevicePtr bargingLD, channelPtr bargedCh
 			// display prompt on Barged Device
 			snprintf(statusmsg, sizeof(statusmsg), SKINNY_DISP_BARGE " " SKINNY_DISP_FROM " %s", l->cid_num);
 			sccp_dev_set_message(d, statusmsg, SCCP_DISPLAYSTATUS_TIMEOUT, FALSE, FALSE);
-			sccp_dev_starttone(bargedLineDevice->device, SKINNY_TONE_ZIP, bargedLineDevice->lineInstance, bargedChannel->callid, SKINNY_TONEDIRECTION_BOTH);
+			sccp_channel_tone(bargedChannel, SKINNY_TONE_ZIP, SKINNY_TONEDIRECTION_BOTH);
 
 			sccp_log(DEBUGCAT_FEATURE)(VERBOSE_PREFIX_2 "%s: is barged in on:%s\n", c->designator, bargedChannel->designator);
 		} else {
@@ -1334,7 +1326,7 @@ void sccp_feat_handle_cbarge(constLinePtr l, uint8_t lineInstance, constDevicePt
 			// we have a channel, checking if
 			if (c->state == SCCP_CHANNELSTATE_OFFHOOK && sccp_strlen_zero(c->dialedNumber)) {
 				// we are dialing but without entering a number :D -FS
-				sccp_dev_stoptone(d, lineInstance, (c && c->callid) ? c->callid : 0);
+				sccp_channel_tone(c, SKINNY_TONE_SILENCE, SKINNY_TONEDIRECTION_BOTH);
 				// changing SOFTSWITCH_DIALING mode to SOFTSWITCH_GETFORWARDEXTEN
 				c->softswitch_action = SCCP_SOFTSWITCH_GETBARGEEXTEN;				/* SoftSwitch will catch a number to be dialed */
 				c->ss_data = 0;									/* this should be found in thread */

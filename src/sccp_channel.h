@@ -139,6 +139,7 @@ SCCP_API void SCCP_CALL sccp_channel_set_calledparty(constChannelPtr channel, co
 SCCP_API boolean_t SCCP_CALL sccp_channel_set_originalCalledparty(constChannelPtr channel, char * name, char * number);
 SCCP_API void SCCP_CALL sccp_channel_set_calleridPresentation(constChannelPtr channel, sccp_callerid_presentation_t presentation);
 
+SCCP_API void SCCP_CALL sccp_channel_tone(constChannelPtr c, skinny_tone_t tone, skinny_toneDirection_t direction);
 SCCP_API void SCCP_CALL sccp_channel_openReceiveChannel(constChannelPtr channel);
 SCCP_API int SCCP_CALL sccp_channel_receiveChannelOpen(devicePtr d, channelPtr c);
 SCCP_API void SCCP_CALL sccp_channel_closeReceiveChannel(constChannelPtr channel, boolean_t KeepPortOpen);
