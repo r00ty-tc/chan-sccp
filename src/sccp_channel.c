@@ -61,6 +61,7 @@ struct sccp_private_channel_data {
 	boolean_t isAnswering;
 	skinny_tone_t tone;
 	skinny_toneDirection_t toneDirection;
+	boolean_t firewall_holepunch;
 };
 
 /*!
@@ -647,6 +648,9 @@ void sccp_channel_StatisticsRequest(constChannelPtr channel)
 	d->protocol->sendConnectionStatisticsReq(d, channel, SKINNY_STATSPROCESSING_CLEAR);
 }
 
+/*
+ * \brief statemachine to Start/Stop device tone generation
+ */
 void sccp_channel_tone(constChannelPtr c, skinny_tone_t tone, skinny_toneDirection_t direction)
 {
 	if(!c || !c->privateData->ld) {
@@ -668,6 +672,37 @@ void sccp_channel_tone(constChannelPtr c, skinny_tone_t tone, skinny_toneDirecti
 	}
 	c->privateData->tone = tone;
 	c->privateData->toneDirection = direction;
+}
+
+/*
+ * \brief a simple way to punch a whole in the firewall by sending a short burst of packets during progress
+ * transmission will be stopped again as soon as the first packet has been received from the device in astwrap_rtp_read
+ */
+static void sccp_channel_startHolePunch(constChannelPtr c)
+{
+	pbx_assert(c != NULL && c->privateData && !c->privateData->firewall_holepunch);
+	sccp_log(DEBUGCAT_RTP)(VERBOSE_PREFIX_3 "%s: (%s) start Punching a hole through the firewall (if necessary)\n", c->designator, __func__);
+	/*! \todo
+		// punching is only necessary if the rtp-instance ip-address+mask differs from the rtp->phone+mask
+		// ie: they are in different networks and there is a potential firewall in between
+		sccp_rtp_t * audio = (sccp_rtp_t *)&(c->rtp.audio);
+		apply_netmask()
+		if (sccp_netsock_cmp_addr(&audio->phone, &audio->phone_remote)) {
+	*/
+	c->privateData->firewall_holepunch = TRUE;
+	sccp_channel_startMediaTransmission(c);
+}
+
+boolean_t sccp_channel_finishHolePunch(constChannelPtr c)
+{
+	pbx_assert(c != NULL && c->privateData);
+	sccp_rtp_t * audio = (sccp_rtp_t *)&(c->rtp.audio);
+	if(c->privateData->firewall_holepunch && ((sccp_rtp_getState(audio, SCCP_RTP_TRANSMISSION) & SCCP_RTP_STATUS_ACTIVE) == SCCP_RTP_STATUS_ACTIVE)) {
+		sccp_log(DEBUGCAT_RTP)(VERBOSE_PREFIX_3 "%s: (%s) stop punching a hole through the firewall\n", c->designator, __func__);
+		sccp_channel_stopMediaTransmission(c, TRUE);
+		c->privateData->firewall_holepunch = FALSE;
+	}
+	return c->privateData->firewall_holepunch;
 }
 
 /*!
@@ -706,7 +741,7 @@ void sccp_channel_openReceiveChannel(constChannelPtr channel)
 	}
 
 	/* create the rtp stuff. It must be create before setting the channel AST_STATE_UP. otherwise no audio will be played */
-	if (!channel->rtp.audio.instance && !sccp_rtp_createServer(d, (channelPtr)channel, SCCP_RTP_AUDIO)) {			// discard const
+	if(!audio->instance && !sccp_rtp_createServer(d, (channelPtr)channel, SCCP_RTP_AUDIO)) {                                        // discard const
 		pbx_log(LOG_WARNING, "%s: Error opening RTP for channel %s\n", d->id, channel->designator);
 		sccp_channel_tone(channel, SKINNY_TONE_REORDERTONE, SKINNY_TONEDIRECTION_USER);
 		return;
@@ -761,12 +796,7 @@ int sccp_channel_receiveChannelOpen(sccp_device_t *d, sccp_channel_t *c)
 	if(c->owner && !pbx_check_hangup_locked(c->owner)) {
 		sccp_rtp_runCallback(audio, SCCP_RTP_RECEPTION, c);
 		if(c->calltype != SKINNY_CALLTYPE_INBOUND) {
-			if(!SCCP_CHANNELSTATE_IsConnected(c->state)) {
-				// knock open the firewall from the inside
-				ast_rtp_instance_sendcng(audio->instance, 0);
-				// sccp_channel_startMediaTransmission(c);
-				// sccp_channel_stopMediaTransmission(c, TRUE);
-			}
+			sccp_channel_startHolePunch(c);
 			iPbx.queue_control(c->owner, (enum ast_control_frame_type)-1);						// 'PROD' the remote side to let them know
 																// we can receive inband signalling from this
 																// moment onwards -> inband signalling required

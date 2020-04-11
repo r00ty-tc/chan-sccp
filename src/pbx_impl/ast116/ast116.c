@@ -557,16 +557,17 @@ static PBX_FRAME_TYPE *sccp_astwrap_rtp_read(PBX_CHANNEL_TYPE * ast)
 				ast_set_write_format(ast, ast_channel_writeformat(ast));
 			}
 		}
+
+		// if we were punching a hole and the first packet has been send, but the call is not yet active
+		// stop the hole punch. (counter part of sccp_channel_startHolePunch())
+		if(pbx_channel_state(ast) != AST_STATE_UP && !sccp_channel_finishHolePunch(c)) {
+			// if hole punch is not active and the channel is not active either, we transmit null packets in the meantime
+			// Only allow audio through if they sent progress
+			ast_frfree(frame);
+			frame = &ast_null_frame;
+		}
 	}
 
-	/* Only allow audio through if they sent progress, or if the channel is actually answered */
-	/* removed causing one way audio trouble, needs more research */
-	/*
-	if(frame && frame->frametype == AST_FRAME_VOICE && ((c->rtp.audio.reception.state & SCCP_RTP_STATUS_ACTIVE) != SCCP_RTP_STATUS_ACTIVE) && pbx_channel_state(ast) != AST_STATE_UP) {
-		ast_frfree(frame);
-		frame = &ast_null_frame;
-	}
-	*/
 EXIT_FUNC:
 	return frame;
 }
