@@ -703,9 +703,6 @@ static int sccp_manager_answerCall2(struct mansession *s, const struct message *
 		if (d) {
 			if (c->state == SCCP_CHANNELSTATE_RINGING) {
 				sccp_channel_answer(d, c);
-				if (c->owner) {
-					iPbx.queue_control(c->owner, AST_CONTROL_ANSWER);
-				}
 				snprintf(retValStr, sizeof(retValStr), "Answered channel '%s' on device '%s'\r\n", channelId, deviceName);
 				astman_send_ack(s, m, retValStr);
 			} else {
