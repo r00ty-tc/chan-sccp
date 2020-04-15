@@ -989,19 +989,17 @@ boolean_t sccp_pbx_channel_allocate(constChannelPtr channel, const void * ids, c
 
 	/* start audio rtp server early, to facilitate choosing codecs via sdp */
 	if (d) {
-		if (c->calltype == SKINNY_CALLTYPE_OUTBOUND) {
-			if (!c->rtp.audio.instance && !sccp_rtp_createServer(d, c, SCCP_RTP_AUDIO)) {
-				pbx_log(LOG_WARNING, "%s: Error opening RTP instance for channel %s\n", d->id, c->designator);
-				goto error_exit;
-			}
-			/*
-			#if CS_SCCP_VIDEO
-						if (sccp_channel_getVideoMode(c) != SCCP_VIDEO_MODE_OFF && sccp_device_isVideoSupported(d) && c->preferences.video[0] != SKINNY_CODEC_NONE && !c->rtp.video.instance &&
-			!sccp_rtp_createServer(d, c, SCCP_RTP_VIDEO)) { pbx_log(LOG_WARNING, "%s: Error opening VRTP instance for channel %s\n", d->id, c->designator); sccp_channel_setVideoMode(c, "off");
-						}
-			#endif
-			*/
+		if(!c->rtp.audio.instance && !sccp_rtp_createServer(d, c, SCCP_RTP_AUDIO)) {
+			pbx_log(LOG_WARNING, "%s: Error opening RTP instance for channel %s\n", d->id, c->designator);
+			goto error_exit;
 		}
+		/*
+		#if CS_SCCP_VIDEO
+				if (sccp_channel_getVideoMode(c) != SCCP_VIDEO_MODE_OFF && sccp_device_isVideoSupported(d) && c->preferences.video[0] != SKINNY_CODEC_NONE && !c->rtp.video.instance && !sccp_rtp_createServer(d,
+		c, SCCP_RTP_VIDEO)) { pbx_log(LOG_WARNING, "%s: Error opening VRTP instance for channel %s\n", d->id, c->designator); sccp_channel_setVideoMode(c, "off");
+				}
+		#endif
+		*/
 		// export sccp informations in asterisk dialplan
 		pbx_builtin_setvar_helper(tmp, "SCCP_DEVICE_MAC", d->id);
 		struct sockaddr_storage sas = { 0 };

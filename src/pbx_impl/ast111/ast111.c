@@ -1719,103 +1719,6 @@ static enum ast_bridge_result sccp_astwrap_rtpBridge(PBX_CHANNEL_TYPE * c0, PBX_
 #endif
 #endif
 
-static enum ast_rtp_glue_result sccp_astwrap_get_rtp_info(PBX_CHANNEL_TYPE * ast, PBX_RTP_TYPE ** rtp)
-{
-	//AUTO_RELEASE(sccp_channel_t, c , get_sccp_channel_from_pbx_channel(ast));				// not following the refcount rules... channel is already retained
-	sccp_channel_t *c = NULL;
-	sccp_rtp_info_t rtpInfo = SCCP_RTP_INFO_NORTP;
-	struct sccp_rtp *audioRTP = NULL;
-	enum ast_rtp_glue_result res = AST_RTP_GLUE_RESULT_REMOTE;
-
-	if (!(c = CS_AST_CHANNEL_PVT(ast))) {
-		sccp_log((DEBUGCAT_RTP)) (VERBOSE_PREFIX_1 "SCCP: (get_rtp_info) NO PVT\n");
-		return AST_RTP_GLUE_RESULT_FORBID;
-	}
-
-	if (pbx_channel_state(ast) != AST_STATE_UP) {
-		sccp_log((DEBUGCAT_CHANNEL | DEBUGCAT_RTP)) (VERBOSE_PREFIX_1 "%s: (get_rtp_info) Asterisk requested EarlyRTP peer for channel %s\n", c->currentDeviceId, pbx_channel_name(ast));
-	} else {
-		sccp_log((DEBUGCAT_CHANNEL | DEBUGCAT_RTP)) (VERBOSE_PREFIX_1 "%s: (get_rtp_info) Asterisk requested RTP peer for channel %s\n", c->currentDeviceId, pbx_channel_name(ast));
-	}
-
-	rtpInfo = sccp_rtp_getAudioPeerInfo(c, &audioRTP);
-	if (rtpInfo == SCCP_RTP_INFO_NORTP) {
-		return AST_RTP_GLUE_RESULT_FORBID;
-	}
-
-	*rtp = audioRTP->instance;
-	if (!*rtp) {
-		return AST_RTP_GLUE_RESULT_FORBID;
-	}
-	// struct ast_sockaddr ast_sockaddr_tmp;
-	// ast_rtp_instance_get_remote_address(*rtp, &ast_sockaddr_tmp);
-	// sccp_log((DEBUGCAT_RTP | DEBUGCAT_HIGH)) (VERBOSE_PREFIX_3 "%s: (get_rtp_info) remote address:'%s:%d'\n", c->currentDeviceId, ast_sockaddr_stringify_host(&ast_sockaddr_tmp), ast_sockaddr_port(&ast_sockaddr_tmp));
-
-	ao2_ref(*rtp, +1);
-	if (ast_test_flag(GLOB(global_jbconf), AST_JB_FORCED)) {
-		sccp_log((DEBUGCAT_RTP)) (VERBOSE_PREFIX_1 "%s: (get_rtp_info) JitterBuffer is Forced. AST_RTP_GET_FAILED\n", c->currentDeviceId);
-		return AST_RTP_GLUE_RESULT_LOCAL;
-	}
-
-	if (!(rtpInfo & SCCP_RTP_INFO_ALLOW_DIRECTRTP)) {
-		sccp_log((DEBUGCAT_RTP)) (VERBOSE_PREFIX_1 "%s: (get_rtp_info) Direct RTP disabled ->  Using AST_RTP_TRY_PARTIAL for channel %s\n", c->currentDeviceId, pbx_channel_name(ast));
-		return AST_RTP_GLUE_RESULT_LOCAL;
-	}
-
-	sccp_log((DEBUGCAT_RTP | DEBUGCAT_HIGH)) (VERBOSE_PREFIX_1 "%s: (get_rtp_info) Channel %s Returning res: %s\n", c->currentDeviceId, pbx_channel_name(ast), ((res == 2) ? "indirect-rtp" : ((res == 1) ? "direct-rtp" : "forbid")));
-	return res;
-}
-
-static enum ast_rtp_glue_result sccp_astwrap_get_vrtp_info(PBX_CHANNEL_TYPE * ast, PBX_RTP_TYPE ** rtp)
-{
-	//AUTO_RELEASE(sccp_channel_t, c , get_sccp_channel_from_pbx_channel(ast));				// not following the refcount rules... channel is already retained
-	sccp_channel_t *c = NULL;
-	sccp_rtp_info_t rtpInfo = SCCP_RTP_INFO_NORTP;
-	struct sccp_rtp *videoRTP = NULL;
-	enum ast_rtp_glue_result res = AST_RTP_GLUE_RESULT_REMOTE;
-
-	if (!(c = CS_AST_CHANNEL_PVT(ast))) {
-		sccp_log((DEBUGCAT_RTP)) (VERBOSE_PREFIX_1 "SCCP: (get_vrtp_info) NO PVT\n");
-		return AST_RTP_GLUE_RESULT_FORBID;
-	}
-
-	if (pbx_channel_state(ast) != AST_STATE_UP) {
-		sccp_log((DEBUGCAT_CHANNEL | DEBUGCAT_RTP)) (VERBOSE_PREFIX_1 "%s: (get_vrtp_info) Asterisk requested EarlyRTP peer for channel %s\n", c->currentDeviceId, pbx_channel_name(ast));
-	} else {
-		sccp_log((DEBUGCAT_CHANNEL | DEBUGCAT_RTP)) (VERBOSE_PREFIX_1 "%s: (get_vrtp_info) Asterisk requested RTP peer for channel %s\n", c->currentDeviceId, pbx_channel_name(ast));
-	}
-
-#ifdef CS_SCCP_VIDEO
-	rtpInfo = sccp_rtp_getVideoPeerInfo(c, &videoRTP);
-#endif
-	if (rtpInfo == SCCP_RTP_INFO_NORTP) {
-		return AST_RTP_GLUE_RESULT_FORBID;
-	}
-
-	*rtp = videoRTP->instance;
-	if (!*rtp) {
-		return AST_RTP_GLUE_RESULT_FORBID;
-	}
-	// struct ast_sockaddr ast_sockaddr_tmp;
-	// ast_rtp_instance_get_remote_address(*rtp, &ast_sockaddr_tmp);
-	// sccp_log((DEBUGCAT_RTP | DEBUGCAT_HIGH)) (VERBOSE_PREFIX_3 "%s: (get_vrtp_info) remote address:'%s:%d'\n", c->currentDeviceId, ast_sockaddr_stringify_host(&ast_sockaddr_tmp), ast_sockaddr_port(&ast_sockaddr_tmp));
-#ifdef HAVE_PBX_RTP_ENGINE_H
-	ao2_ref(*rtp, +1);
-#endif
-	if (ast_test_flag(GLOB(global_jbconf), AST_JB_FORCED)) {
-		sccp_log((DEBUGCAT_RTP)) (VERBOSE_PREFIX_1 "%s: (get_vrtp_info) JitterBuffer is Forced. AST_RTP_GET_FAILED\n", c->currentDeviceId);
-		return AST_RTP_GLUE_RESULT_FORBID;
-	}
-
-	if (!(rtpInfo & SCCP_RTP_INFO_ALLOW_DIRECTRTP)) {
-		sccp_log((DEBUGCAT_RTP)) (VERBOSE_PREFIX_1 "%s: (get_vrtp_info) Direct RTP disabled ->  Using AST_RTP_TRY_PARTIAL for channel %s\n", c->currentDeviceId, pbx_channel_name(ast));
-		return AST_RTP_GLUE_RESULT_LOCAL;
-	}
-
-	sccp_log((DEBUGCAT_RTP | DEBUGCAT_HIGH)) (VERBOSE_PREFIX_1 "%s: (get_vrtp_info) Channel %s Returning res: %s\n", c->currentDeviceId, pbx_channel_name(ast), ((res == 2) ? "indirect-rtp" : ((res == 1) ? "direct-rtp" : "forbid")));
-	return res;
-}
-
 static int sccp_astwrap_update_rtp_peer(PBX_CHANNEL_TYPE * ast, PBX_RTP_TYPE * rtp, PBX_RTP_TYPE * vrtp, PBX_RTP_TYPE * trtp, const struct ast_format_cap *codecs, int nat_active)
 {
 	//AUTO_RELEASE(sccp_channel_t, c , get_sccp_channel_from_pbx_channel(ast));				// not following the refcount rules... channel is already retained
@@ -2820,20 +2723,20 @@ static boolean_t sccp_astwrap_attended_transfer(sccp_channel_t * destination_cha
 #if defined(__cplusplus) || defined(c_plusplus)
 static struct ast_rtp_glue sccp_rtp = {
 	/* *INDENT-OFF* */
-	type:	SCCP_TECHTYPE_STR,
-	mod:	NULL,
-	get_rtp_info:sccp_astwrap_get_rtp_info,
-	get_vrtp_info:sccp_astwrap_get_vrtp_info,
-	get_trtp_info:NULL,
-	update_peer:sccp_astwrap_update_rtp_peer,
-	get_codec:sccp_astwrap_getCodec,
+	type: SCCP_TECHTYPE_STR,
+	mod: NULL,
+	get_rtp_info: sccp_astgenwrap_get_rtp_info,
+	get_vrtp_info: sccp_astgenwrap_get_vrtp_info,
+	get_trtp_info: NULL,
+	update_peer: sccp_astwrap_update_rtp_peer,
+	get_codec: sccp_astwrap_getCodec,
 	/* *INDENT-ON* */
 };
 #else
 static struct ast_rtp_glue sccp_rtp = {
 	.type = SCCP_TECHTYPE_STR,
-	.get_rtp_info = sccp_astwrap_get_rtp_info,
-	.get_vrtp_info = sccp_astwrap_get_vrtp_info,
+	.get_rtp_info = sccp_astgenwrap_get_rtp_info,
+	.get_vrtp_info = sccp_astgenwrap_get_vrtp_info,
 	.update_peer = sccp_astwrap_update_rtp_peer,
 	.get_codec = sccp_astwrap_getCodec,
 };

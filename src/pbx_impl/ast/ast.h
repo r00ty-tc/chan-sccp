@@ -167,6 +167,8 @@ void sccp_astgenwrap_set_pickupgroup(sccp_channel_t *channel, ast_group_t value)
 void sccp_astgenwrap_set_named_callgroups(sccp_channel_t *channel, struct ast_namedgroups *value);
 void sccp_astgenwrap_set_named_pickupgroups(sccp_channel_t *channel, struct ast_namedgroups *value);
 #endif
+enum ast_rtp_glue_result sccp_astgenwrap_get_rtp_info(PBX_CHANNEL_TYPE * ast, PBX_RTP_TYPE ** rtp);
+enum ast_rtp_glue_result sccp_astgenwrap_get_vrtp_info(PBX_CHANNEL_TYPE * ast, PBX_RTP_TYPE ** rtp);
 
 enum ast_pbx_result pbx_pbx_start(struct ast_channel *pbx_channel);
 // kate: indent-width 8; replace-tabs off; indent-mode cstyle; auto-insert-doxygen on; line-numbers on; tab-indents on; keep-extra-spaces off; auto-brackets off;
