@@ -865,7 +865,6 @@ static int sccp_astwrap_indicate(PBX_CHANNEL_TYPE * ast, int ind, const void *da
 					c->progress_sent = TRUE;
 				}
 			}
-			// inband_if_receivechannel = TRUE;
 			break;
 
 		default:
