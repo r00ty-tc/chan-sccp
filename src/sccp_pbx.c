@@ -72,7 +72,13 @@ sccp_channel_request_status_t sccp_requestChannel(const char * lineName, sccp_au
 
 	// Allocate a new SCCP channel.
 	/* on multiline phone we set the line when answering or switching lines */
-	AUTO_RELEASE(sccp_channel_t, my_sccp_channel, sccp_channel_allocate(l, NULL));
+	AUTO_RELEASE(sccp_linedevice_t, ld, NULL);
+	SCCP_LIST_LOCK(&l->devices);
+	if(SCCP_LIST_GETSIZE(&l->devices) == 1) {
+		ld = sccp_linedevice_retain(SCCP_LIST_FIRST(&l->devices));
+	}
+	SCCP_LIST_UNLOCK(&l->devices);
+	AUTO_RELEASE(sccp_channel_t, my_sccp_channel, sccp_channel_allocate(l, ld ? ld->device : NULL));
 	if (!my_sccp_channel) {
 		return SCCP_REQUEST_STATUS_ERROR;
 	}
@@ -993,13 +999,20 @@ boolean_t sccp_pbx_channel_allocate(constChannelPtr channel, const void * ids, c
 			pbx_log(LOG_WARNING, "%s: Error opening RTP instance for channel %s\n", d->id, c->designator);
 			goto error_exit;
 		}
+#if CS_SCCP_VIDEO
 		/*
-		#if CS_SCCP_VIDEO
-				if (sccp_channel_getVideoMode(c) != SCCP_VIDEO_MODE_OFF && sccp_device_isVideoSupported(d) && c->preferences.video[0] != SKINNY_CODEC_NONE && !c->rtp.video.instance && !sccp_rtp_createServer(d,
-		c, SCCP_RTP_VIDEO)) { pbx_log(LOG_WARNING, "%s: Error opening VRTP instance for channel %s\n", d->id, c->designator); sccp_channel_setVideoMode(c, "off");
-				}
-		#endif
+		if (
+			sccp_channel_getVideoMode(c) != SCCP_VIDEO_MODE_OFF
+			&& sccp_device_isVideoSupported(d)
+			&& c->preferences.video[0] != SKINNY_CODEC_NONE
+			&& !c->rtp.video.instance
+			&& !sccp_rtp_createServer(d, c, SCCP_RTP_VIDEO)
+		) {
+			pbx_log(LOG_WARNING, "%s: Error opening VRTP instance for channel %s\n", d->id, c->designator);
+			sccp_channel_setVideoMode(c, "off");
+		}
 		*/
+#endif
 		// export sccp informations in asterisk dialplan
 		pbx_builtin_setvar_helper(tmp, "SCCP_DEVICE_MAC", d->id);
 		struct sockaddr_storage sas = { 0 };

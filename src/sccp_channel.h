@@ -41,6 +41,8 @@ struct sccp_channel {
 	boolean_t answered_elsewhere;										/*!< Answered Elsewhere */
 	boolean_t privacy;											/*!< Private */
 	boolean_t peerIsSCCP;											/*!< Indicates that channel-peer is also SCCP */
+	boolean_t earlyrtp;
+	boolean_t progress_sent;
 	sccp_video_mode_t videomode;										/*!< Video Mode (0 off - 1 user - 2 auto) */
 
 	devicePtr (*getDevice)(constChannelPtr channel);                                                        /*!< function to retrieve refcounted device */

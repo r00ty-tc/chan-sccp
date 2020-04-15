@@ -37,6 +37,8 @@ struct sccp_rtp {
 	struct sockaddr_storage phone_remote;									/*!< phone destination address (starttransmission) */
 	uint16_t RTCPPortNumber;										/*!< RTCP Port used by the phone */
  	boolean_t directMedia;											/*!< Show if we are running in directmedia mode (set in pbx_impl during rtp bridging) */
+														// time_t lastrtprx;
+	// time_t lastrtptx;
 };														/*!< SCCP RTP Structure */
 
 SCCP_API boolean_t SCCP_CALL sccp_rtp_createServer(constDevicePtr d, channelPtr c, sccp_rtp_type_t type);

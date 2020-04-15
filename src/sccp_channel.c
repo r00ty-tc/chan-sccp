@@ -180,6 +180,8 @@ channelPtr sccp_channel_allocate(constLinePtr l, constDevicePtr device)
 		channel->calltype = SKINNY_CALLTYPE_INBOUND;
 		channel->answered_elsewhere = FALSE;
 		channel->peerIsSCCP = 0;
+		channel->progress_sent = FALSE;
+		channel->earlyrtp = (device && device->earlyrtp != SCCP_EARLYRTP_NONE) ? TRUE : FALSE;
 		// channel->maxBitRate = 15000;
 		channel->maxBitRate = 3200;
 		iPbx.set_owner(channel, NULL);
@@ -327,6 +329,7 @@ void sccp_channel_setDevice(channelPtr channel, constDevicePtr device)
 #endif
 		sccp_copy_string(channel->currentDeviceId, channel->privateData->device->id, sizeof(char[StationMaxDeviceNameSize]));
 		channel->dtmfmode = channel->privateData->device->getDtmfMode(channel->privateData->device);
+		channel->earlyrtp = (channel->privateData->device->earlyrtp != SCCP_EARLYRTP_NONE) ? TRUE : FALSE;
 		return;
 	}
 EXIT:
@@ -340,6 +343,7 @@ EXIT:
 	// sccp_line_copyMinimumCodecSetFromLineToChannel(l, c); 
 	sccp_copy_string(channel->currentDeviceId, "SCCP", sizeof(char[StationMaxDeviceNameSize]));
 	channel->dtmfmode = SCCP_DTMFMODE_RFC2833;
+	channel->earlyrtp = FALSE;
 }
 
 static void sccp_channel_recalculateAudioCodecFormat(channelPtr channel)
@@ -417,7 +421,9 @@ static boolean_t sccp_channel_recalculateVideoCodecFormat(channelPtr channel)
 		sccp_codec_reduceSet(preferences->video, channel->capabilities.video);
 		joint = sccp_codec_findBestJoint(channel, preferences->video, channel->remoteCapabilities.video, FALSE);
 		if (joint == SKINNY_CODEC_NONE) {
-			sccp_channel_setVideoMode(channel, "off");
+			if(SCCP_CHANNELSTATE_IsConnected(channel->state)) {
+				sccp_channel_setVideoMode(channel, "off");
+			}
 			return FALSE;
 		}
 		//if (channel->rtp.video.instance) {
@@ -681,7 +687,7 @@ void sccp_channel_tone(constChannelPtr c, skinny_tone_t tone, skinny_toneDirecti
 static void sccp_channel_startHolePunch(constChannelPtr c)
 {
 	pbx_assert(c != NULL && c->privateData && !c->privateData->firewall_holepunch);
-	sccp_log(DEBUGCAT_RTP)(VERBOSE_PREFIX_3 "%s: (%s) start Punching a hole through the firewall (if necessary)\n", c->designator, __func__);
+	sccp_rtp_t * audio = (sccp_rtp_t *)&(c->rtp.audio);
 	/*! \todo
 		// punching is only necessary if the rtp-instance ip-address+mask differs from the rtp->phone+mask
 		// ie: they are in different networks and there is a potential firewall in between
@@ -689,13 +695,20 @@ static void sccp_channel_startHolePunch(constChannelPtr c)
 		apply_netmask()
 		if (sccp_netsock_cmp_addr(&audio->phone, &audio->phone_remote)) {
 	*/
-	c->privateData->firewall_holepunch = TRUE;
-	sccp_channel_startMediaTransmission(c);
+	if(!sccp_rtp_getState(audio, SCCP_RTP_TRANSMISSION) && pbx_channel_state(c->owner) != AST_STATE_UP) {
+		sccp_log(DEBUGCAT_RTP)(VERBOSE_PREFIX_3 "%s: (%s) start Punching a hole through the firewall (if necessary)\n", c->designator, __func__);
+		c->privateData->firewall_holepunch = TRUE;
+		sccp_channel_startMediaTransmission(c);
+	}
 }
 
 boolean_t sccp_channel_finishHolePunch(constChannelPtr c)
 {
 	pbx_assert(c != NULL && c->privateData);
+	if(pbx_channel_state(c->owner) == AST_STATE_UP) {
+		c->privateData->firewall_holepunch = FALSE;
+		return FALSE;
+	}
 	sccp_rtp_t * audio = (sccp_rtp_t *)&(c->rtp.audio);
 	if(c->privateData->firewall_holepunch && ((sccp_rtp_getState(audio, SCCP_RTP_TRANSMISSION) & SCCP_RTP_STATUS_ACTIVE) == SCCP_RTP_STATUS_ACTIVE)) {
 		sccp_log(DEBUGCAT_RTP)(VERBOSE_PREFIX_3 "%s: (%s) stop punching a hole through the firewall\n", c->designator, __func__);
@@ -798,8 +811,6 @@ int sccp_channel_receiveChannelOpen(sccp_device_t *d, sccp_channel_t *c)
 		if(c->calltype != SKINNY_CALLTYPE_INBOUND) {
 			sccp_channel_startHolePunch(c);
 			iPbx.queue_control(c->owner, (enum ast_control_frame_type)-1);						// 'PROD' the remote side to let them know
-																// we can receive inband signalling from this
-																// moment onwards -> inband signalling required
 		}
 	}
 	return sccp_rtp_getState(audio, SCCP_RTP_RECEPTION);
@@ -1811,7 +1822,7 @@ void sccp_channel_answer(constDevicePtr device, channelPtr channel)
 	sccp_channel_end_forwarding_channel(channel);
 
 	AUTO_RELEASE(sccp_channel_t, previous_channel, sccp_device_getActiveChannel(device));
-	if(previous_channel && !sccp_channel_hold(previous_channel)) {
+	if(previous_channel && previous_channel != channel && !sccp_channel_hold(previous_channel)) {
 		pbx_log(LOG_ERROR, "%s: Putting Active Channel:%s OnHold failed -> While trying to answer incoming call:%s. Skipping answer!\n", device->id, previous_channel->designator, channel->designator);
 		return;
 	}
@@ -1821,6 +1832,10 @@ void sccp_channel_answer(constDevicePtr device, channelPtr channel)
 		if(pbx_channel_state(pbx_channel) == AST_STATE_RINGING && !pbx_check_hangup_locked(pbx_channel) && !channel->privateData->isAnswering) {
 			channel->setDevice(channel, device);
 			channel->privateData->isAnswering = TRUE;
+			if(pbx_channel_state(pbx_channel) != AST_STATE_UP && !channel->progress_sent && channel->earlyrtp) {
+				pbx_indicate(pbx_channel, AST_CONTROL_PROGRESS);
+				channel->progress_sent = TRUE;
+			}
 			if (channel->state != SCCP_CHANNELSTATE_OFFHOOK) {	/* 7911 need to have callstate offhook, before connected, to transmit audio */
 				sccp_indicate(device, channel, SCCP_CHANNELSTATE_OFFHOOK);
 			}
